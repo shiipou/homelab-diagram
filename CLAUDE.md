@@ -1,35 +1,30 @@
-# CLAUDE.md – adapting this diagram to someone else's homelab
+# CLAUDE.md – this homelab diagram
 
-You are helping a user turn **their** homelab into a diagram like `docs/example.png`. The repo currently describes the original author's lab. Your job: find out what their lab looks like, rewrite `inventory.yaml`, adapt the layout in `build.py`, and iterate on the render with them until they are happy.
+This fork describes a Freebox Ultra, MochaBin 5G router, and Talos Kubernetes homelab. Keep `inventory.yaml` and the hand-placed layout in `build.py` synchronized when changing the topology.
 
 Start by telling the user briefly how this works (interview → inventory → layout → render/feedback rounds), then begin the interview. Don't ask everything at once.
 
 ## How the repo works
 
-- `inventory.yaml` – all content: VLANs, devices, switch ports, port forwards, server hardware, VMs/containers, storage pools, the media pipeline.
-- `build.py` – hand-placed layout. Draws an SVG with absolute coordinates (logical canvas `W = 2400`, height `H`), embeds icons as base64, converts to PNG with `rsvg-convert -z 1.6` (so PNG pixels = SVG units × 1.6).
-- `fetch_icons.py` – downloads service icons into `icons/` (dashboard-icons). Own glyphs `icons/glyph-*.svg` are in the repo.
-- Output: `out/homelab.png` (redacted, safe to post) and `out/homelab-unredacted.png` (`--unredacted`).
+- `inventory.yaml` – topology, IP assignments, router and switch ports, Talos nodes, BGP VIPs, ingress ports, and storage devices.
+- `build.py` – draws the hand-placed SVG layout (logical canvas `W = 2400`, `H = 1460`), embeds icons as base64, and converts it to PNG with `rsvg-convert -z 1.6`.
+- `icons/glyph-*.svg` – local hardware icons used by this diagram; no icon download is needed.
+- Output: `out/homelab.png` and `out/homelab.svg`. The diagram contains private network addresses; `--unredacted` only writes a second copy with an `-unredacted` filename.
 
-### What is generic and what is hardcoded
+### Inventory and layout
 
-Generic (driven by the YAML): VLAN table, legend, "Open to the internet" card, cloud services, OPNsense hardware/services lists, switch ports (labels, VLAN ticks, colors), device cards, SSIDs, server hardware tiles, guest cards, DMZ groups and their chips, multi-app container cards, storage pools, the media pipeline nodes and shares.
-
-Hardcoded in `build.py` (you will almost certainly edit these):
+Inventory-driven content includes device models and addresses, router and switch port targets, node roles and specifications, VIPs, ingress ports, and storage devices. Layout and card positions are hand-placed in `build.py`:
 
 | Section (search for) | What's fixed | Typical change |
 |---|---|---|
-| `# TOP: edge chain` | positions `CX`, `cy0`, `fy, fh` (ISP router), `ox, oy, ow, oh` (firewall), `bx, by, bw, bh` (switch) | different heights/widths, no ISP router (bridge mode), no separate firewall |
-| ISP router block (`FBX`, `COAX_X`, `FB_PORTS`) | a cable modem with a coax port + LAN ports, firewall in `opnsense_port` | DSL/fiber/ONT: rename the coax port or remove it, change port list |
-| `port_x()`, `PX0, PITCH` | switch with 8 RJ45 + 2 SFP+ in one row | other port counts, second switch |
-| `# device row`: `DY`, `MAD/KVM/AP/ZB` tuples and the `device("madcat", …)` calls | which devices sit under the switch, their x/width/height, and the cable routing to them (`MAD_10G`, `KVM_IN`, `AP_IN`, `ZB_IN`, the `S.line(... PORTS["etherN"] ...)` calls) | add/remove devices, re-route cables so they don't cross |
-| `# terra` | the big server card: `tx0, ty0`, `GY`, `ZH`, hardware column width `HWW`, guest column `gx, gw` | several servers, other column split |
-| other-VLAN guests | `og["truenas"]`, `og["haos"]`, `og["unifi"]`, `og["bliss"]` drawn one below another with fixed heights | different VMs outside the DMZ |
-| `# DMZ zone`: `NCOL` and the `column(i, [group names])` calls | which DMZ group goes into which column | rebalance columns for their groups |
-| `# media pipeline` | an *arr/Jellyfin explainer panel | remove the whole section if they don't want it, or reuse it for another flow |
-| `W, H` | canvas size | grow `H` when content gets taller (the asserts at the end tell you) |
+| `# Internet edge` | ISP, router, and 5G failover card positions | move or resize WAN devices |
+| `# MochaBin port map` | `eth0`/`eth1` SFP+ badges, `eth2`, and `lan0`–`lan3` positions | adjust port layout or target labels |
+| `# Cilium / VIPs / ingress` | VIP list and ingress panel | add or remove cluster services |
+| `# Kubernetes nodes` | two four-card rows and their spacing | add nodes or rearrange connection groups |
+| `# Switch port map` | eight compact port cards | change switch size or port labels |
+| `W, H` | SVG canvas size | grow the canvas when content gets taller |
 
-Safety nets: `assert`s at the end of sections fail loudly when a column/panel overflows. Text widths come from `measure()` (Pillow + the real font) or the rough estimate `tw()`. Always check visually.
+Always inspect the rendered image for clipped text, overlap, and excess whitespace.
 
 ## The interview
 
@@ -52,28 +47,22 @@ Useful read-only commands if you have access (ask first): Proxmox `pct list`, `q
 ## The work loop
 
 1. Write `inventory.yaml` for their lab (keep the schema; extend it when needed and teach `build.py` the new fields).
-2. Adapt `build.py`: decide which panels exist, adjust the hardcoded positions above, remove sections they don't need.
-3. `python3 fetch_icons.py` (add new icons to `ICON_MAP` first: local name → name in [dashboard-icons](https://github.com/homarr-labs/dashboard-icons); dark icons need a `-light` variant or an entry in `RECOLOR`).
+2. Adapt `build.py`: decide which panels exist and adjust the hand-placed positions above.
+3. Use a local `glyph-*.svg` icon or add an SVG to `icons/` and reference its filename.
 4. `python3 build.py`, then **look at `out/homelab.png` yourself** before showing it. Zoom into busy areas: `magick out/homelab.png -crop 1400x600+X+Y +repage -resize 70% /tmp/crop.png` (X/Y in PNG pixels = SVG coordinates × 1.6). Look for overlapping text, cables crossing cards, text running out of boxes, empty gaps.
 5. Show the user, take feedback, change, re-render. Expect many small rounds, that's normal.
-6. Before they share it: render without `--unredacted` and `grep` `out/homelab.svg` for their real domain, SSID names and anything private.
+6. This fork's default render includes private IP addresses. Before public sharing, redact private identifiers in the inventory and inspect the generated SVG and PNG.
 
 ## Design rules (keep them unless the user wants otherwise)
 
-- **Line width = negotiated link speed** (`SPEED_W`), plus a small speed tag where a cable reaches a device. Trunks (tagged VLANs) are a white cable with a dark core; access links use the VLAN color.
-- Only **physical cables are solid lines**. Dotted = logical, over the internet (VPN, cloud services). Dashed grey = KVM console.
-- **Card border = the device's VLAN color**; devices on a trunk (firewall, switch, hypervisor, APs with several SSIDs) get the neutral `TRUNK_BORDER`.
-- **Physical devices** use the folder-tab card: tab = `name · type`; body = icon, full model name (or what it is, for self-built machines), `IP · hostname` in the VLAN color, OS + version.
-- **Hardware tiles** have the tan bar on the left; label = type (CPU, MEMORY, SSD, …), value = the part, sub line = extra info or `passthrough → <guest>`.
-- **DMZ chips:** `CT <id>` top-right, `.<last octet>` below it; third line = hostname: blue `app.domain` if public via the reverse proxy, `name.internal` otherwise, plus a `LAN` pill when the public hostname is LAN/VPN-only.
-- **Multi-app containers** are one taller card with a row per app. The Docker badge only appears on multi-app Docker containers.
-- **No internal-only ports** (API ports etc.); only what's forwarded from the internet appears, in the "Open to the internet" card.
-- ZFS sizes in TiB/GiB (what ZFS reports), disk sizes in TB as sold.
+- The Freebox link is primary; MochaBin 5G is failover.
+- Keep the MochaBin SFP and 2×2 LAN port targets synchronized with the node connection labels.
+- Use role colors for control planes, workers, and the separate storage appliance.
+- Show BGP VIPs and only the public HTTP/HTTPS ingress ports.
+- Keep hardware and storage details plain and concise.
 - Keep text plain and short; no marketing-style subtitles.
 
 ## Gotchas
 
-- Fonts: **Fira Sans** and **Fira Code** must be installed, otherwise rsvg falls back and every width calculation is off.
-- jsDelivr sometimes refuses single icons with 403; `fetch_icons.py` falls back to raw GitHub.
-- When content grows, grow `H` (and section heights like `ZH`), the asserts tell you where.
-- A device whose cable enters from above must have its entry point right of its folder tab (see how `KVM_IN`/`AP_IN` use `tab_width()`).
+- Fonts: **Fira Sans** and **Fira Code** should be installed for consistent rendering.
+- When content grows, grow `H` or adjust the affected panel and card positions.

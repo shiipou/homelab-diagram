@@ -1,8 +1,8 @@
 # homelab-diagram
 
-The script behind the network diagram of my homelab that I posted on r/homelab. It turns a YAML file describing the lab into a big SVG/PNG diagram in the style of the diagrams you see on r/homelab.
+This fork diagrams a Freebox Ultra, MochaBin 5G router, and Talos Kubernetes homelab. It turns `inventory.yaml` into an SVG and PNG.
 
-![Example output](docs/example.png)
+![Homelab network diagram](out/homelab.png)
 
 > [!IMPORTANT]
 > **This is not a general tool.** The *content* comes from `inventory.yaml`, but the *layout* (where every box, port and cable goes) is hand-placed in `build.py` for exactly my network. If you want to use it for yours, expect to move coordinates around in the code. Think of it as a starting point, not a finished product.
@@ -12,19 +12,16 @@ The script behind the network diagram of my homelab that I posted on r/homelab. 
 
 ## What it shows
 
-- the path from the internet through the ISP router (with its real ports) and the firewall to the core switch
-- every switch port with the VLANs on it (tall bar = untagged, short bars = tagged)
-- cables whose **line width is the negotiated link speed** (10G / 2.5G / 1G / 100M), trunks drawn as a white cable with a dark core
-- the devices with name, type, model, IP · hostname and OS
-- the Proxmox host with its hardware, the VMs/CTs outside the DMZ, the TrueNAS pools (disks, vdevs, usage) and every DMZ container with its CT ID, IP and hostname
-- containers that run several apps as one card with a row per app
-- what's open to the internet, a legend, the networks table and a small "media pipeline" explainer
+- Freebox primary WAN and MochaBin 5G failover, including the MochaBin port assignments
+- the Netgear GS308 and its attached devices
+- Talos control-plane and worker nodes with their assigned addresses
+- Cilium BGP VIPs, Traefik ingress ports, and the separate Raspberry Pi storage appliance
 
 ## How it works
 
-- `inventory.yaml` holds everything the picture shows: VLANs, devices, switch ports, port forwards, hardware, containers, pools.
-- `build.py` draws the diagram as SVG with hand-placed coordinates, embeds the icons and converts it to PNG with `rsvg-convert`. Text widths for a few labels are measured with Pillow from the real font, so tabs and badges fit their text.
-- **Redaction:** by default the real domain is replaced with `redacted.com` and SSIDs get generic names, so the PNG can be posted publicly. `python3 build.py --unredacted` renders a private version with the real values from `inventory.yaml`.
+- `inventory.yaml` holds the topology, IP assignments, hardware, BGP VIPs, ingress ports, and storage devices.
+- `build.py` draws the hand-placed layout as SVG, embeds the included glyph icons, and converts it to PNG with `rsvg-convert`.
+- The diagram contains private network addresses and is not redacted. `python3 build.py --unredacted` writes a second copy with an `-unredacted` filename.
 
 ## Requirements
 
@@ -38,18 +35,17 @@ On Debian/Ubuntu: `apt install python3-yaml python3-pil librsvg2-bin fonts-firac
 ## Usage
 
 ```bash
-python3 fetch_icons.py          # downloads the service icons into icons/ (once)
-python3 build.py                # → out/homelab.svg + out/homelab.png (redacted)
+python3 build.py                # → out/homelab.svg + out/homelab.png (private)
 python3 build.py --unredacted   # → out/homelab-unredacted.svg + .png
 ```
 
-The service icons are **not** in this repo, `fetch_icons.py` downloads them from [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons). Only my own small glyphs (`icons/glyph-*.svg`: CPU, RAM, SSD, …) are included.
+The current diagram uses the local glyphs in `icons/`; service icon downloads are not required.
 
 ## Making it your own
 
-1. Change `inventory.yaml` to your network. Texts, IPs, ports, VLAN colors and the container groups come from there.
-2. Look at the render. Things that don't fit are layout: the top part (cloud, ISP router, firewall, switch, device row) and the column split inside the server card are coordinates in `build.py` (search for `fy, fh`, `ox, oy`, `bx, by`, `DY`, `MAD = …`).
-3. New icons: drop an SVG into `icons/` and use its file name in the inventory.
+1. Change `inventory.yaml` to your network.
+2. Update the hand-placed positions in `build.py` when adding or moving devices. The main sections are the internet edge, MochaBin port map, BGP/VIP panel, node rows, and switch port map.
+3. Use the included `icons/glyph-*.svg` icons or add another SVG under `icons/`.
 
 ## Using it with Claude Code
 
