@@ -8,6 +8,7 @@ network:
   subnet: "172.26.0.0/16"
   gateway: "172.26.0.1"
   note: "OpenWrt LAN · Kubernetes"
+  ethernet_speed: "1G"
 
 kubernetes:
   name: "Talos Kubernetes"
@@ -55,7 +56,15 @@ switch:
     - {port: 5, to: "Free"}
     - {port: 6, to: "Free"}
     - {port: 7, to: "Free"}
-    - {port: 8, to: "Free"}
+    - {port: 8, to: "MochaBin eth2 · uplink"}
+
+jetkvm:
+  name: "JetKVM"
+  type: "IP-KVM"
+  ip: "192.168.10.200"
+  connection: "Freebox Ultra · direct LAN"
+  console: "On-demand HDMI + USB to all Talos nodes and the storage Raspberry Pi"
+  excludes: "MochaBin and Netgear GS308"
 
 nodes:
   - name: "LattePanda 1"

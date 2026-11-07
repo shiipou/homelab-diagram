@@ -7,7 +7,7 @@ Start by telling the user briefly how this works (interview → inventory → la
 ## How the repo works
 
 - `inventory.yaml` – topology, IP assignments, router and switch ports, Talos nodes, BGP VIPs, ingress ports, and storage devices.
-- `build.py` – draws the hand-placed SVG layout (logical canvas `W = 2400`, `H = 1460`), embeds icons as base64, and converts it to PNG with `rsvg-convert -z 1.6`.
+- `build.py` – draws the hand-placed SVG layout (logical canvas `W = 2400`, `H = 1820`), embeds icons as base64, and converts it to PNG with `rsvg-convert -z 1.6`.
 - `icons/glyph-*.svg` – local hardware icons used by this diagram; no icon download is needed.
 - Output: `out/homelab.png` and `out/homelab.svg`. The diagram contains private network addresses; `--unredacted` only writes a second copy with an `-unredacted` filename.
 
@@ -18,7 +18,7 @@ Inventory-driven content includes device models and addresses, router and switch
 | Section (search for) | What's fixed | Typical change |
 |---|---|---|
 | `# Internet edge` | ISP, router, and 5G failover card positions | move or resize WAN devices |
-| `# MochaBin port map` | `eth0`/`eth1` SFP+ badges, `eth2`, and `lan0`–`lan3` positions | adjust port layout or target labels |
+| `# MochaBin port map` | `eth0`/`eth1` SFP+ badges, `eth2`, and the physical 2×2 `lan0`–`lan3` grid | adjust port layout or target labels |
 | `# Cilium / VIPs / ingress` | VIP list and ingress panel | add or remove cluster services |
 | `# Kubernetes nodes` | two four-card rows and their spacing | add nodes or rearrange connection groups |
 | `# Switch port map` | eight compact port cards | change switch size or port labels |
