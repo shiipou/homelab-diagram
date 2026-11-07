@@ -14,7 +14,7 @@ ICONS = ROOT / "icons"
 OUT = ROOT / "out"
 UNREDACTED = "--unredacted" in sys.argv
 
-W, H = 2400, 1460
+W, H = 2400, 1820
 BG = "#0b0f15"
 GRID = "#151c26"
 PANEL = "#111821"
@@ -30,6 +30,7 @@ WORKER = "#bc8cff"
 STORAGE = "#c08a5c"
 WAN = "#f0883e"
 TRUNK = "#d5dde6"
+SPEED_W = {"1G": 2.4, "10G": 8.5}
 
 
 class SVG:
@@ -174,75 +175,115 @@ endpoint(
 )
 endpoint(1888, 165, 470, 140, "5G backup", ["5G card · unlimited data SIM", "Failover WAN"], "glyph-antenna", LINK)
 S.line([(328, 235), (400, 235)], LINK, 3)
-S.line([(870, 235), (970, 235)], WAN, 5)
+S.line([(870, 235), (970, 235)], WAN, SPEED_W["10G"])
 S.text(920, 223, INV["freebox"]["link"], 11, WAN, 600, anchor="middle", mono=True)
 S.line([(1690, 235), (1888, 235)], LINK, 2.5, dash="5 6")
 S.text(1789, 223, "FAILOVER", 11, LINK, 600, anchor="middle", mono=True)
 
-# MochaBin port map
-px, py, pw, ph = 42, 355, 1470, 290
+# JetKVM: Ethernet to the Freebox; dashed link represents on-demand console access.
+jetkvm = INV["jetkvm"]
+endpoint(
+    400, 345, 470, 100, jetkvm["name"],
+    [f"{jetkvm['type']} · {jetkvm['ip']}", jetkvm["connection"]],
+    "glyph-nic", STORAGE
+)
+S.line([(635, 305), (635, 345)], WAN, SPEED_W["1G"])
+S.text(650, 334, INV["network"]["ethernet_speed"], 10.5, WAN, 600, mono=True)
+S.rect(970, 345, 720, 100, fill=PANEL2, stroke=MUTED + "88", dash="6 6")
+S.text(992, 375, "On-demand HDMI + USB console", 17, TEXT, 600)
+S.text(992, 399, jetkvm["console"], 12.5, MUTED, 400)
+S.text(992, 421, f"Excludes {jetkvm['excludes']}", 11.5, FAINT, 500)
+S.line([(870, 395), (970, 395)], MUTED, 2, dash="6 6")
+
+# MochaBin interfaces. The LAN jacks mirror the physical 2 × 2 layout.
+px, py, pw, ph = 42, 470, 2316, 350
 mochabin_ports = INV["mochabin"]["ports"]
-panel(px, py, pw, ph, "MochaBin port map", "eth0 faces left · eth1 empty · eth2 uplink · lan0–lan3 direct LAN")
-port_box(62, 430, 210, 78, "eth0", mochabin_ports["eth0"], WAN, "SFP+")
-port_box(284, 430, 210, 78, "eth1", mochabin_ports["eth1"], FAINT, "SFP+")
-port_box(506, 430, 240, 78, "eth2", mochabin_ports["eth2"], CP)
-S.text(785, 422, "2 × 2 LAN PORT GROUP", 11, STORAGE, 700)
-lan_ports = [
-    ("lan0", mochabin_ports["lan0"]),
-    ("lan1", mochabin_ports["lan1"]),
-    ("lan2", mochabin_ports["lan2"]),
-    ("lan3", mochabin_ports["lan3"]),
-]
-for i, (label, target) in enumerate(lan_ports):
+panel(
+    px, py, pw, ph, "MochaBin port map",
+    f"eth0 faces left · eth1 empty · eth2 → GS308 · LAN gateway {INV['network']['gateway']}/16"
+)
+port_box(62, 570, 250, 60, "eth0", mochabin_ports["eth0"], WAN, "SFP+")
+port_box(340, 570, 250, 60, "eth1", mochabin_ports["eth1"], FAINT, "SFP+")
+port_box(620, 570, 290, 60, "eth2", mochabin_ports["eth2"], CP)
+for i, (label, target) in enumerate(
+    (("lan0", mochabin_ports["lan0"]), ("lan1", mochabin_ports["lan1"]),
+     ("lan2", mochabin_ports["lan2"]), ("lan3", mochabin_ports["lan3"]))
+):
     col, row = i % 2, i // 2
-    port_box(785 + col * 345, 435 + row * 84, 330, 68, label, target, STORAGE)
-S.text(px + 22, py + ph - 21, "LAN gateway 172.26.0.1/16", 13, CP, 600, mono=True)
+    port_box(1020 + col * 330, 570 + row * 70, 300, 60, label, target, STORAGE)
 
-# Cilium / VIPs / ingress
-bx, by, bw, bh = 1540, 355, 818, 290
-panel(bx, by, bw, bh, "Cilium BGP", f"Talos cluster · {INV['network']['subnet']}", stroke=CP + "88")
-for i, vip in enumerate(INV["bgp"]["vip_services"]):
-    yy = by + 74 + i * 45
-    S.rect(bx + 18, yy, bw - 36, 36, fill=CHIP, stroke=BORDER, rx=8)
-    S.text(bx + 32, yy + 23, vip["name"], 13, TEXT, 500)
-    S.text(bx + bw - 32, yy + 23, vip["ip"], 13, CP, 600, anchor="end", mono=True)
-S.text(bx + 24, by + bh - 22, "Internet ingress · TCP 80 / 443 → Traefik VIP", 13, LINK, 600)
-
-# Kubernetes nodes
+# Server cards and their physical Ethernet paths.
 nodes = INV["nodes"]
 direct = by_port([n for n in nodes if n["group"] == "MochaBin direct"], r"lan(\d+)")
-lan_storage = dict(INV["storage"], name=INV["storage"]["name"], role="Storage", model=INV["storage"]["model"],
-                   connection=INV["storage"]["connection"], storage=True)
+lan_storage = dict(
+    INV["storage"], name=INV["storage"]["name"], role="Storage",
+    model=INV["storage"]["model"], connection=INV["storage"]["connection"], storage=True
+)
 direct.append(lan_storage)
 sw_nodes = by_port([n for n in nodes if n["group"] == "GS308"], r"port (\d+)")
-node_xs = [42, 632, 1222, 1812]
-node_w, node_h = 546, 245
-S.text(42, 713, "MOCHABIN 2 × 2 DIRECT LINKS", 13, STORAGE, 700)
-S.text(2358, 713, "3 TALOS NODES + STORAGE", 12, MUTED, 500, "end")
-for i, node in enumerate(direct):
-    node_card(node, node_xs[i], 735, node_w, node_h)
+node_xs = [42, 642, 1242, 1842]
+node_w, node_h = 540, 245
+direct_y, switch_y = 900, 1365
 
-S.text(42, 1040, "NETGEAR GS308 · UPLINK FROM MOCHABIN ETH2", 13, CP, 700)
-S.text(2358, 1040, "GIGABIT SWITCH", 12, MUTED, 500, "end")
-for i, node in enumerate(sw_nodes):
-    node_card(node, node_xs[i], 1062, node_w, node_h)
+direct_links = [
+    ([(1170, 570), (1170, 535), (320, 535), (320, direct_y), (312, direct_y)], CP, 330, 700),
+    ([(1650, 600), (1810, 600), (1810, direct_y + 122), (1782, direct_y + 122)], CP, 1818, 800),
+    ([(1020, 670), (890, 670), (890, 800), (912, 800), (912, direct_y)], CP, 900, 790),
+    ([(1650, 670), (1760, 670), (1760, 850), (2112, 850), (2112, direct_y)], STORAGE, 1840, 840),
+]
+for points, color, label_x, label_y in direct_links:
+    S.line(points, color, SPEED_W["1G"])
+    S.text(label_x, label_y, INV["network"]["ethernet_speed"], 10.5, color, 600, mono=True)
 
-# Switch port map
-sx, sy, sw, sh = 42, 1352, 1470, 76
+# GS308 port map. Port 8 is the eth2 uplink; ports 1–4 serve the workers.
+sx, sy, sw, sh = 42, 1190, 2316, 100
 S.rect(sx, sy, sw, sh, fill=PANEL2, stroke=BORDER, rx=10)
-S.text(sx + 18, sy + 29, INV["switch"]["name"], 14, TEXT, 600)
+S.text(sx + 18, sy + 30, INV["switch"]["name"], 15, TEXT, 600)
+S.text(sx + 18, sy + 51, f"{INV['switch']['uplink']} · 1G uplink", 11, MUTED, 500)
+switch_port_x = 280
+switch_port_step = 260
+switch_port_w = 210
 for i, port in enumerate(INV["switch"]["ports"]):
-    cx = sx + 265 + i * 147
-    color = CP if port["to"] != "Free" else FAINT
+    x = switch_port_x + i * switch_port_step
+    color = FAINT if port["to"] == "Free" else CP if "MochaBin" in port["to"] else WORKER
     target = port["to"].split(" · ")[0]
     target = target.replace("HP EliteDesk 800 G6 Mini", "HP Mini 2").replace("IBM dual-Xeon", "IBM")
-    S.rect(cx, sy + 13, 135, 49, fill=CHIP, stroke=color + "88", rx=7)
-    S.text(cx + 10, sy + 31, f"P{port['port']} · {target}", 10.5, color, 600)
-    S.text(cx + 10, sy + 49, "in use" if port["to"] != "Free" else "free", 10, MUTED, 400)
+    S.rect(x, sy + 17, switch_port_w, 60, fill=CHIP, stroke=color + "88", rx=7)
+    S.text(x + 10, sy + 37, f"P{port['port']} · {target}", 10.5, color, 600)
+    S.text(x + 10, sy + 58, "free" if port["to"] == "Free" else "connected", 10, MUTED, 400)
 
-S.text(42, 1450, "Control planes", 11, CP, 600)
-S.text(175, 1450, "Workers", 11, WORKER, 600)
-S.text(265, 1450, "Storage appliance", 11, STORAGE, 600)
+# Visible 1G cable from eth2 through the gap between the direct nodes to switch port 8.
+uplink_x = switch_port_x + 7 * switch_port_step + switch_port_w / 2
+S.line([(625, 605), (625, 1160), (uplink_x, 1160), (uplink_x, sy + 17)], CP, SPEED_W["1G"])
+
+for i, node in enumerate(sw_nodes):
+    port_number = int(node["connection"].rsplit(" ", 1)[1])
+    source_x = switch_port_x + (port_number - 1) * switch_port_step + switch_port_w / 2
+    target_x = node_xs[i] + node_w / 2
+    S.line([(source_x, sy + 77), (target_x, switch_y)], WORKER, SPEED_W["1G"])
+    S.text(source_x + 8, 1318, INV["network"]["ethernet_speed"], 10, WORKER, 600, mono=True)
+
+direct_node_xs = [node_xs[0], node_xs[2], node_xs[1], node_xs[3]]
+for i, node in enumerate(direct):
+    node_card(node, direct_node_xs[i], direct_y, node_w, node_h)
+for i, node in enumerate(sw_nodes):
+    node_card(node, node_xs[i], switch_y, node_w, node_h)
+
+# Cilium / VIPs / ingress
+bx, by, bw, bh = 42, 1640, 2316, 148
+panel(bx, by, bw, bh, "Cilium BGP", f"Talos cluster · {INV['network']['subnet']}", stroke=CP + "88")
+vip_width = 740
+for i, vip in enumerate(INV["bgp"]["vip_services"]):
+    x = bx + 18 + i * 758
+    S.rect(x, by + 67, vip_width, 36, fill=CHIP, stroke=BORDER, rx=8)
+    S.text(x + 14, by + 90, vip["name"], 13, TEXT, 500)
+    S.text(x + vip_width - 14, by + 90, vip["ip"], 13, CP, 600, anchor="end", mono=True)
+S.text(bx + 20, by + 131, "Public ingress · TCP 80 / 443 → Traefik VIP", 11.5, LINK, 600)
+S.text(
+    bx + bw - 20, by + 131,
+    "1G Ethernet · 10G SFP+ · dashed = on-demand HDMI/USB",
+    11.5, MUTED, 500, "end"
+)
 
 OUT.mkdir(exist_ok=True)
 name = "homelab-unredacted" if UNREDACTED else "homelab"
