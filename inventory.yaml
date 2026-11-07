@@ -39,7 +39,7 @@ mochabin:
     eth2: "Netgear GS308 uplink"
     lan0: "LattePanda 1 · control plane"
     lan1: "LattePanda 2 · control plane"
-    lan2: "HP Mini 1 · worker"
+    lan2: "Raspberry Pi 5 · control plane"
     lan3: "Storage Raspberry Pi"
 
 switch:
@@ -48,7 +48,7 @@ switch:
   model: "8-port Gigabit Ethernet"
   uplink: "MochaBin eth2"
   ports:
-    - {port: 1, to: "Raspberry Pi 5 · control plane"}
+    - {port: 1, to: "HP Mini 1 · worker"}
     - {port: 2, to: "IBM dual-Xeon · worker"}
     - {port: 3, to: "Core i9-9900K · worker"}
     - {port: 4, to: "HP EliteDesk 800 G6 Mini · worker"}
@@ -77,15 +77,15 @@ nodes:
     model: "Raspberry Pi 5"
     specs: ["8 GB RAM"]
     ip: "172.26.1.112"
-    connection: "GS308 port 1"
-    group: "GS308"
+    connection: "MochaBin lan2"
+    group: "MochaBin direct"
   - name: "HP Mini 1"
     role: "Worker"
     model: "HP EliteDesk 800 G6 Mini · Core i5"
     specs: ["16 GB RAM"]
     ip: "172.26.1.201"
-    connection: "MochaBin lan2"
-    group: "MochaBin direct"
+    connection: "GS308 port 1"
+    group: "GS308"
   - name: "HP Mini 2"
     role: "Worker"
     model: "HP EliteDesk 800 G6 Mini · Core i5"
